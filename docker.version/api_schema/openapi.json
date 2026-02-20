@@ -1,0 +1,969 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "钉钉 CalDAV 客户端 API",
+    "version": "0.1.0",
+    "description": "提供日历同步和管理功能的REST API服务，自动使用主日历（第一个日历）",
+    "contact": {
+      "name": "API Support",
+      "url": "https://github.com/your-repo/calendar-dingtalk-client"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "本地开发服务器"
+    },
+    {
+      "url": "http://192.168.1.204:8000",
+      "description": "生产服务器"
+    }
+  ],
+  "tags": [
+    {
+      "name": "系统",
+      "description": "系统相关接口"
+    },
+    {
+      "name": "日历",
+      "description": "日历资源管理"
+    },
+    {
+      "name": "事件",
+      "description": "日历事件(VEVENT)的CRUD操作"
+    },
+    {
+      "name": "待办",
+      "description": "日历待办(VTODO)的CRUD操作"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "系统"
+        ],
+        "summary": "健康检查",
+        "description": "检查服务运行状态",
+        "operationId": "health_check",
+        "responses": {
+          "200": {
+            "description": "服务正常运行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calendars": {
+      "get": {
+        "tags": [
+          "日历"
+        ],
+        "summary": "获取日历列表",
+        "description": "返回所有可用的日历资源列表",
+        "operationId": "list_calendars",
+        "responses": {
+          "200": {
+            "description": "日历列表获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "事件"
+        ],
+        "summary": "获取事件列表",
+        "description": "获取主日历下的所有事件，支持按日期范围筛选",
+        "operationId": "list_events",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "筛选起始日期时间"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "筛选结束日期时间"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "事件列表获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "事件"
+        ],
+        "summary": "创建事件",
+        "description": "在主日历中创建新的日历事件",
+        "operationId": "create_event",
+        "parameters": [
+          {
+            "name": "summary",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "事件标题"
+            }
+          },
+          {
+            "name": "dtstart",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "事件开始时间"
+            }
+          },
+          {
+            "name": "dtend",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "事件结束时间"
+            }
+          },
+          {
+            "name": "description",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "事件详细描述"
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "事件地点"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "事件UID，若未提供则自动生成UUID"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "事件创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{event_uid}": {
+      "get": {
+        "tags": [
+          "事件"
+        ],
+        "summary": "获取事件详情",
+        "description": "获取单个事件的完整信息",
+        "operationId": "get_event",
+        "parameters": [
+          {
+            "name": "event_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "事件唯一标识(UID)"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "事件详情获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "事件不存在"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "事件"
+        ],
+        "summary": "更新事件",
+        "description": "更新已有事件的属性信息",
+        "operationId": "update_event",
+        "parameters": [
+          {
+            "name": "event_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "事件唯一标识(UID)"
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "事件标题"
+            }
+          },
+          {
+            "name": "dtstart",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "事件开始时间"
+            }
+          },
+          {
+            "name": "dtend",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "事件结束时间"
+            }
+          },
+          {
+            "name": "description",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "事件详细描述"
+            }
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "事件地点"
+            }
+          },
+          {
+            "name": "if_match",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "资源的ETag值，用于乐观锁控制"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "事件更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "事件不存在"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "事件"
+        ],
+        "summary": "删除事件",
+        "description": "删除一个事件",
+        "operationId": "delete_event",
+        "parameters": [
+          {
+            "name": "event_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "事件唯一标识(UID)"
+            }
+          },
+          {
+            "name": "if_match",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "资源的ETag值，用于乐观锁控制"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "事件删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "事件不存在"
+          }
+        }
+      }
+    },
+    "/api/todos": {
+      "get": {
+        "tags": [
+          "待办"
+        ],
+        "summary": "获取待办列表",
+        "description": "获取主日历下的所有待办事项",
+        "operationId": "list_todos",
+        "responses": {
+          "200": {
+            "description": "待办列表获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodoListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "待办"
+        ],
+        "summary": "创建待办",
+        "description": "在主日历中创建新的待办事项",
+        "operationId": "create_todo",
+        "parameters": [
+          {
+            "name": "summary",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "待办标题"
+            }
+          },
+          {
+            "name": "due",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "截止时间"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                5,
+                9
+              ],
+              "description": "优先级"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEEDS-ACTION",
+                "IN-PROCESS",
+                "COMPLETED"
+              ],
+              "description": "初始状态"
+            }
+          },
+          {
+            "name": "uid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "待办UID，若未提供则自动生成UUID"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "待办创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/todos/{todo_uid}": {
+      "get": {
+        "tags": [
+          "待办"
+        ],
+        "summary": "获取待办详情",
+        "description": "获取单个待办事项的完整信息",
+        "operationId": "get_todo",
+        "parameters": [
+          {
+            "name": "todo_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "待办唯一标识(UID)"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "待办详情获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodoDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "待办不存在"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "待办"
+        ],
+        "summary": "更新待办",
+        "description": "更新已有待办事项的属性信息",
+        "operationId": "update_todo",
+        "parameters": [
+          {
+            "name": "todo_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "待办唯一标识(UID)"
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "description": "待办标题"
+            }
+          },
+          {
+            "name": "due",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "截止时间"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                0,
+                1,
+                5,
+                9
+              ],
+              "description": "优先级"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEEDS-ACTION",
+                "IN-PROCESS",
+                "COMPLETED",
+                "CANCELLED"
+              ],
+              "description": "状态"
+            }
+          },
+          {
+            "name": "if_match",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "资源的ETag值，用于乐观锁控制"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "待办更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "待办不存在"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "待办"
+        ],
+        "summary": "删除待办",
+        "description": "删除一个待办事项",
+        "operationId": "delete_todo",
+        "parameters": [
+          {
+            "name": "todo_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "待办唯一标识(UID)"
+            }
+          },
+          {
+            "name": "if_match",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "资源的ETag值，用于乐观锁控制"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "待办删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "待办不存在"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "unhealthy"
+            ],
+            "description": "服务健康状态"
+          },
+          "service": {
+            "type": "string",
+            "description": "服务名称"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "example": {
+          "status": "healthy",
+          "service": "calendar-dingtalk-client"
+        }
+      },
+      "Calendar": {
+        "type": "object",
+        "description": "日历资源",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "日历资源的CalDAV URL"
+          },
+          "name": {
+            "type": "string",
+            "description": "日历名称标识"
+          },
+          "displayname": {
+            "type": "string",
+            "description": "日历显示名称"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "日历描述信息"
+          }
+        },
+        "required": [
+          "url",
+          "name",
+          "displayname"
+        ],
+        "example": {
+          "url": "https://calendar.dingtalk.com/primary/",
+          "name": "primary",
+          "displayname": "我的日历",
+          "description": null
+        }
+      },
+      "CalendarListResponse": {
+        "type": "object",
+        "properties": {
+          "calendars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Calendar"
+            },
+            "description": "日历资源列表"
+          }
+        },
+        "required": [
+          "calendars"
+        ],
+        "example": {
+          "calendars": [
+            {
+              "url": "https://calendar.dingtalk.com/primary/",
+              "name": "primary",
+              "displayname": "我的日历",
+              "description": null
+            },
+            {
+              "url": "https://calendar.dingtalk.com/Inbox/",
+              "name": "Inbox",
+              "displayname": "日程收件箱",
+              "description": null
+            }
+          ]
+        }
+      },
+      "Event": {
+        "type": "object",
+        "description": "日历事件",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "description": "事件唯一标识符"
+          },
+          "summary": {
+            "type": "string",
+            "description": "事件标题"
+          },
+          "dtstart": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "事件开始时间"
+          },
+          "dtend": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "事件结束时间"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "事件详细描述"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "事件地点"
+          },
+          "etag": {
+            "type": "string",
+            "description": "资源版本标识"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "事件资源的完整URL"
+          }
+        },
+        "required": [
+          "uid",
+          "summary"
+        ]
+      },
+      "EventListResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "description": "事件列表"
+          },
+          "count": {
+            "type": "integer",
+            "description": "事件总数"
+          }
+        },
+        "required": [
+          "events",
+          "count"
+        ]
+      },
+      "EventResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "message": {
+            "type": "string",
+            "description": "操作结果描述"
+          },
+          "event": {
+            "$ref": "#/components/schemas/Event"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "创建的事件资源URL"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "EventDetailResponse": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/Event"
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "Todo": {
+        "type": "object",
+        "description": "日历待办",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "description": "待办唯一标识符"
+          },
+          "summary": {
+            "type": "string",
+            "description": "待办标题"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEEDS-ACTION",
+              "IN-PROCESS",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "description": "待办状态"
+          },
+          "due": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "待办截止时间"
+          },
+          "priority": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              5,
+              9
+            ],
+            "description": "优先级"
+          },
+          "etag": {
+            "type": "string",
+            "description": "资源版本标识"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "待办资源的完整URL"
+          }
+        },
+        "required": [
+          "uid",
+          "summary"
+        ]
+      },
+      "TodoListResponse": {
+        "type": "object",
+        "properties": {
+          "todos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Todo"
+            },
+            "description": "待办列表"
+          },
+          "count": {
+            "type": "integer",
+            "description": "待办总数"
+          }
+        },
+        "required": [
+          "todos",
+          "count"
+        ]
+      },
+      "TodoResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "message": {
+            "type": "string",
+            "description": "操作结果描述"
+          },
+          "todo": {
+            "$ref": "#/components/schemas/Todo"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "创建的待办资源URL"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "TodoDetailResponse": {
+        "type": "object",
+        "properties": {
+          "todo": {
+            "$ref": "#/components/schemas/Todo"
+          }
+        },
+        "required": [
+          "todo"
+        ]
+      },
+      "DeleteResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "操作是否成功"
+          },
+          "message": {
+            "type": "string",
+            "description": "操作结果描述"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "example": {
+          "success": true,
+          "message": "Event deleted successfully"
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "错误详情"
+          }
+        }
+      }
+    }
+  }
+}
