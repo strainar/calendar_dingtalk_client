@@ -87,19 +87,43 @@ class CalDAVClient:
         end_date: Optional[datetime] = None,
         component_type: str = "VEVENT",
     ) -> List[Dict[str, Any]]:
-        """获取事件列表 - 使用 PROPFIND 代替 REPORT（钉钉服务器兼容性问题）"""
+        """获取事件列表 - 使用 REPORT calendar-query 方法（钉钉服务器兼容）"""
         logger.info(f"Fetching events from {calendar_url}")
 
+        # 构建日期范围字符串
+        time_range_filter = ""
+        if start_date and end_date:
+            start_str = start_date.strftime("%Y%m%dT%H%M%SZ")
+            end_str = end_date.strftime("%Y%m%dT%H%M%SZ")
+            time_range_filter = f"<C:time-range start=\"{start_str}\" end=\"{end_str}\"/>"
+        elif start_date:
+            # 只有开始日期，向后查一年
+            end_date = start_date.replace(year=start_date.year + 1)
+            start_str = start_date.strftime("%Y%m%dT%H%M%SZ")
+            end_str = end_date.strftime("%Y%m%dT%H%M%SZ")
+            time_range_filter = f"<C:time-range start=\"{start_str}\" end=\"{end_str}\"/>"
+
+        # 使用 REPORT calendar-query 方法
         xml = (
             '<?xml version="1.0" encoding="utf-8" ?>'
-            '<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
-            "<D:prop><D:resourcetype/><D:getcontenttype/><D:getetag/></D:prop>"
-            "</D:propfind>"
+            '<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+            "<D:prop>"
+            "<D:getetag/>"
+            "<C:calendar-data/>"
+            "</D:prop>"
+            "<C:filter>"
+            "<C:comp-filter name=\"VCALENDAR\">"
+            f"<C:comp-filter name=\"{component_type}\">"
+            f"{time_range_filter}"
+            "</C:comp-filter>"
+            "</C:comp-filter>"
+            "</C:filter>"
+            "</C:calendar-query>"
         )
 
         try:
             response = await self._client.request(
-                "PROPFIND",
+                "REPORT",
                 calendar_url,
                 content=xml,
                 headers={
@@ -108,7 +132,7 @@ class CalDAVClient:
                 },
             )
             response.raise_for_status()
-            events = await self._parse_events_from_propfind(response.text, calendar_url)
+            events = await self._parse_events_from_report(response.text, calendar_url)
             logger.info(f"Found {len(events)} events")
             return events
         except Exception as e:
@@ -331,6 +355,96 @@ class CalDAVClient:
 
         except Exception as e:
             print(f"[ERROR] Parse events from propfind error: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+        print(f"[DEBUG] Returning {len(events)} events")
+        return events
+
+    async def _parse_events_from_report(
+        self, xml_text: str, calendar_url: str
+    ) -> List[Dict[str, Any]]:
+        """从 REPORT calendar-query 响应解析事件（直接包含 calendar-data）"""
+        events = []
+        try:
+            print(f"[DEBUG] Parsing events from REPORT for calendar: {calendar_url}")
+            root = etree.fromstring(xml_text.encode())
+            ns = {"D": "DAV:", "C": "urn:ietf:params:xml:ns:caldav"}
+
+            for response in root.findall(".//D:response", ns):
+                href_elem = response.find("D:href", ns)
+                if href_elem is None or href_elem.text is None:
+                    continue
+
+                href = href_elem.text
+
+                if href == "/" or href.endswith("/"):
+                    continue
+
+                ok_propstat = None
+                for propstat in response.findall("D:propstat", ns):
+                    status = propstat.find("D:status", ns)
+                    if status is not None and "200" in status.text:
+                        ok_propstat = propstat
+                        break
+
+                if ok_propstat is None:
+                    continue
+
+                prop = ok_propstat.find("D:prop", ns)
+                if prop is None:
+                    continue
+
+                # REPORT 响应直接包含 calendar-data
+                caldata_elem = prop.find("C:calendar-data", ns)
+                etag_elem = prop.find("D:getetag", ns)
+
+                if caldata_elem is None or caldata_elem.text is None:
+                    continue
+
+                try:
+                    # 解析 iCalendar 数据
+                    from ..icalendar.parser import parse_event
+
+                    ical_data = caldata_elem.text
+                    event_data = parse_event(ical_data)
+
+                    if event_data:
+                        from urllib.parse import urlparse
+
+                        parsed = urlparse(self.base_url)
+                        event_url = f"{parsed.scheme}://{parsed.netloc}{href}"
+
+                        event = {
+                            "url": event_url,
+                            "etag": etag_elem.text.strip('"') if etag_elem is not None and etag_elem.text else None,
+                            "uid": event_data.get("uid", ""),
+                            "summary": str(event_data.get("summary", "")),
+                            "dtstart": str(event_data.get("dtstart"))
+                            if event_data.get("dtstart")
+                            else None,
+                            "dtend": str(event_data.get("dtend"))
+                            if event_data.get("dtend")
+                            else None,
+                            "location": str(event_data.get("location", ""))
+                            if event_data.get("location")
+                            else None,
+                            "description": str(event_data.get("description", ""))
+                            if event_data.get("description")
+                            else None,
+                        }
+                        events.append(event)
+                        print(
+                            f"[DEBUG] Parsed event: {event.get('summary', 'unknown')}, url: {event['url'][:50]}..."
+                        )
+
+                except Exception as e:
+                    print(f"[ERROR] Error parsing event {href}: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"[ERROR] Parse events from report error: {e}")
             import traceback
 
             traceback.print_exc()
